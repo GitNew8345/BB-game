@@ -6,8 +6,6 @@ export const generateChassisImages = async (parts: string[]): Promise<Record<str
   const model = 'gemini-2.5-flash-image';
   const images: Record<string, string> = {};
 
-  // We generate images sequentially or in parallel. 
-  // For better reliability and avoiding rate limits for images, we process them.
   const promises = parts.map(async (part) => {
     try {
       const response = await ai.models.generateContent({
@@ -22,16 +20,19 @@ export const generateChassisImages = async (parts: string[]): Promise<Record<str
       });
 
       let imageUrl = '';
-      for (const partRes of response.candidates?.[0]?.content?.parts || []) {
-        if (partRes.inlineData) {
-          imageUrl = `data:image/png;base64,${partRes.inlineData.data}`;
-          break;
+      const candidate = response.candidates?.[0];
+      if (candidate && candidate.content && candidate.content.parts) {
+        for (const partRes of candidate.content.parts) {
+          if (partRes.inlineData) {
+            imageUrl = `data:image/png;base64,${partRes.inlineData.data}`;
+            break;
+          }
         }
       }
-      return { name: part, url: imageUrl };
+      
+      return { name: part, url: imageUrl || `https://picsum.photos/seed/${part}/200/200` };
     } catch (error) {
       console.error(`Error generating image for ${part}:`, error);
-      // Fallback placeholder
       return { name: part, url: `https://picsum.photos/seed/${part}/200/200` };
     }
   });

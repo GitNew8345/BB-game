@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { CHASSIS_PARTS } from './constants';
-import { CardState, GameStatus } from './types';
-import { generateChassisImages } from './services/geminiService';
-import Card from './components/Card';
+import React, { useState, useEffect } from 'react';
+import { CHASSIS_PARTS } from './constants.ts';
+import { CardState, GameStatus } from './types.ts';
+import { generateChassisImages } from './services/geminiService.ts';
+import Card from './components/Card.tsx';
 
 const App: React.FC = () => {
   const [cards, setCards] = useState<CardState[]>([]);
@@ -15,13 +15,11 @@ const App: React.FC = () => {
   const [timer, setTimer] = useState(0);
   const [highScore, setHighScore] = useState<number | null>(null);
 
-  // Load High Score
   useEffect(() => {
     const saved = localStorage.getItem('chassis_memory_highscore');
     if (saved) setHighScore(parseInt(saved, 10));
   }, []);
 
-  // Timer logic
   useEffect(() => {
     let interval: number;
     if (status === GameStatus.PLAYING) {
@@ -50,7 +48,6 @@ const App: React.FC = () => {
           id: part,
           imageUrl: imageUrls[part]
         };
-        // Create two of each
         gameCards.push({
           ...basePart,
           uniqueId: `${part}-1`,
@@ -65,7 +62,6 @@ const App: React.FC = () => {
         });
       });
 
-      // Shuffle
       const shuffled = gameCards.sort(() => Math.random() - 0.5);
       setCards(shuffled);
       setStatus(GameStatus.PLAYING);
@@ -94,7 +90,6 @@ const App: React.FC = () => {
       const secondCard = cards.find(c => c.uniqueId === secondId);
 
       if (firstCard && secondCard && firstCard.id === secondCard.id) {
-        // Match!
         setTimeout(() => {
           setCards(prev => prev.map(c => 
             (c.uniqueId === firstId || c.uniqueId === secondId) 
@@ -105,7 +100,6 @@ const App: React.FC = () => {
           setFlippedIndices([]);
         }, 600);
       } else {
-        // No match
         setTimeout(() => {
           setCards(prev => prev.map(c => 
             (c.uniqueId === firstId || c.uniqueId === secondId) 
@@ -136,7 +130,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen text-white p-4 flex flex-col items-center">
-      {/* Header */}
       <header className="mb-8 text-center">
         <h1 className="text-4xl md:text-6xl font-bungee text-blue-500 mb-2 drop-shadow-lg">
           CHASSIS MASTER
@@ -146,7 +139,6 @@ const App: React.FC = () => {
         </p>
       </header>
 
-      {/* Main Container */}
       <main className="w-full max-w-4xl bg-slate-900/50 rounded-3xl p-6 border border-slate-700 shadow-2xl backdrop-blur-sm">
         {status === GameStatus.IDLE && (
           <div className="py-20 text-center">
@@ -179,7 +171,6 @@ const App: React.FC = () => {
 
         {(status === GameStatus.PLAYING || status === GameStatus.WON) && (
           <>
-            {/* HUD */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700 text-center">
                 <div className="text-xs text-slate-400 font-bold">MOVES</div>
@@ -199,7 +190,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Grid */}
             <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
               {cards.map(card => (
                 <Card 
@@ -223,13 +213,11 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer Info */}
       <footer className="mt-12 text-slate-500 text-sm text-center">
         <p>Featured Parts: {CHASSIS_PARTS.join(' • ')}</p>
         <p className="mt-2 text-xs opacity-50">Powered by Gemini 2.5 Flash Image Model</p>
       </footer>
 
-      {/* Win Modal */}
       {status === GameStatus.WON && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-6">
           <div className="bg-slate-900 border-2 border-blue-500 rounded-3xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(59,130,246,0.5)]">
