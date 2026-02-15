@@ -5,6 +5,20 @@ import { CardState, GameStatus } from './types.ts';
 import { generateChassisImages } from './services/geminiService.ts';
 import Card from './components/Card.tsx';
 
+// Extend window for AI Studio helpers
+declare global {
+  // Augment the existing AIStudio interface
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
+  interface Window {
+    // Explicitly use the AIStudio type to match environment expectations and avoid type mismatch errors
+    aistudio: AIStudio;
+  }
+}
+
 const App: React.FC = () => {
   const [cards, setCards] = useState<CardState[]>([]);
   const [flippedIndices, setFlippedIndices] = useState<string[]>([]);
@@ -14,6 +28,7 @@ const App: React.FC = () => {
   const [loadingStep, setLoadingStep] = useState('');
   const [timer, setTimer] = useState(0);
   const [highScore, setHighScore] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('chassis_memory_highscore');
@@ -30,7 +45,31 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [status]);
 
+  const handleApiKeySelection = async () => {
+    try {
+      if (typeof window.aistudio !== 'undefined') {
+        await window.aistudio.openSelectKey();
+        // Proceed to init game after triggering key selection to mitigate race condition
+        initGame();
+      }
+    } catch (err) {
+      setError("Failed to open API key selection dialog.");
+    }
+  };
+
   const initGame = async () => {
+    setError(null);
+    
+    // Check for API key first
+    if (typeof window.aistudio !== 'undefined') {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        setStatus(GameStatus.IDLE);
+        setError("Please select a paid API key to generate high-quality images.");
+        return;
+      }
+    }
+
     setStatus(GameStatus.GENERATING);
     setLoadingStep('Drawing cartoon parts with Gemini AI...');
     setMoves(0);
@@ -65,10 +104,19 @@ const App: React.FC = () => {
       const shuffled = gameCards.sort(() => Math.random() - 0.5);
       setCards(shuffled);
       setStatus(GameStatus.PLAYING);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setLoadingStep('Failed to load images. Retrying...');
-      setTimeout(initGame, 2000);
+      // If the request fails with "Requested entity was not found", reset state and prompt for key selection
+      if (err.message?.includes("Requested entity was not found") || err.message?.includes("API key")) {
+        setError("API Key issue detected. Please re-select your API key.");
+        setStatus(GameStatus.IDLE);
+        if (typeof window.aistudio !== 'undefined') {
+          await window.aistudio.openSelectKey();
+        }
+      } else {
+        setLoadingStep('Failed to load images. Retrying...');
+        setTimeout(initGame, 3000);
+      }
     }
   };
 
@@ -141,20 +189,46 @@ const App: React.FC = () => {
 
       <main className="w-full max-w-4xl bg-slate-900/50 rounded-3xl p-6 border border-slate-700 shadow-2xl backdrop-blur-sm">
         {status === GameStatus.IDLE && (
-          <div className="py-20 text-center">
-            <div className="mb-8 inline-block p-6 bg-slate-800 rounded-full animate-bounce">
+          <div className="py-12 text-center">
+            {error && (
+              <div className="mb-8 p-4 bg-red-500/20 border border-red-500 rounded-xl text-red-200 text-sm font-bold">
+                {error}
+              </div>
+            )}
+            
+            <div className="mb-8 inline-block p-6 bg-slate-800 rounded-full animate-pulse">
               <svg className="w-16 h-16 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
+            
             <h2 className="text-2xl font-bold mb-4">Ready to test your car part knowledge?</h2>
-            <button 
-              onClick={initGame}
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bungee text-xl transition-all active:scale-95 shadow-lg shadow-blue-500/20"
-            >
-              Start Game
-            </button>
+            
+            <div className="flex flex-col gap-4 items-center">
+              <button 
+                onClick={initGame}
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bungee text-xl transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+              >
+                Start Game
+              </button>
+              
+              <button 
+                onClick={handleApiKeySelection}
+                className="text-xs text-slate-400 hover:text-white underline decoration-dotted transition-colors"
+              >
+                Connect to Gemini API (Required)
+              </button>
+              
+              <a 
+                href="https://ai.google.dev/gemini-api/docs/billing" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] text-slate-500 hover:underline"
+              >
+                View billing documentation
+              </a>
+            </div>
           </div>
         )}
 
@@ -215,7 +289,7 @@ const App: React.FC = () => {
 
       <footer className="mt-12 text-slate-500 text-sm text-center">
         <p>Featured Parts: {CHASSIS_PARTS.join(' • ')}</p>
-        <p className="mt-2 text-xs opacity-50">Powered by Gemini 2.5 Flash Image Model</p>
+        <p className="mt-2 text-xs opacity-50">Powered by Gemini 3 Pro Image Model</p>
       </footer>
 
       {status === GameStatus.WON && (
