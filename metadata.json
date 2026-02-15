@@ -1,0 +1,5 @@
+{
+  "name": "Chassis Master Memory",
+  "description": "An interactive memory puzzle game featuring AI-generated cartoon car chassis parts like shock absorbers and brake pads. Match the pairs to win!",
+  "requestFramePermissions": []
+}
